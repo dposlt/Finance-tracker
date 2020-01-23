@@ -155,24 +155,6 @@ class Spending(tk.Frame):
 
         button_submit_entry = ttk.Button(self, text="SUBMIT", command=self.submitt)
         button_submit_entry.place(x=676, y=120)
-        # ENTRY ==========================================================
-    def submitt(self):
-        self.entry_field_date.delete(0, tk.END)
-        self.entry_field_date.insert(0, ACTUAL_DATE)
-        #self.entry_field_description.delete(0, tk.END)
-        #self.entry_field_description.insert(0, "")
-        #self.entry_field_category.delete(0, tk.END)
-        #self.entry_field_category.insert(0, "")
-        #self.entry_field_amount.delete(0, tk.END)
-        #self.entry_field_amount.insert(0, "0")
-
-        get_entry_field_date = self.entry_field_date.get()
-        get_entry_field_ddescription = self.entry_field_description.get()
-        get_entry_field_category = self.entry_field_category.get()
-        get_entry_field_amount = float(self.entry_field_amount.get())
-
-        self.adding_spending(get_entry_field_date, get_entry_field_ddescription, get_entry_field_category, get_entry_field_amount)
-
         # HISTORY ========================================================
         self.table_spending_history = ttk.Treeview(self, height=16,selectmode="none", displaycolumns="#all")
         self.table_spending_history['columns'] = ("DATE", "DESCRIPTION", "CATEGORY", "AMOUNT")
@@ -189,16 +171,41 @@ class Spending(tk.Frame):
         self.table_spending_history.place(x=250, y=170)
         self.refresh_sqldata()
 
-        # READ SQL DATA into SPENDING HISTORY =============================
-    def refresh_sqldata(self):
-        val = sql.spending_history()
-        self.table_spending_history.insert("", 0, values=val)
-        #table_spending_history.insert("", 0, values=["2020-01-01", "hello", "auto", 50.0])
+        # ENTRY ==========================================================
+        self.entry_field_date.insert(0, ACTUAL_DATE)
+    def submitt(self):
+        #self.entry_field_date.insert(0, ACTUAL_DATE)
+        #self.entry_field_description.delete(0, tk.END)
+        #self.entry_field_description.insert(0, "")
+        #self.entry_field_category.delete(0, tk.END)
+        #self.entry_field_category.insert(0, "")
+        #self.entry_field_amount.delete(0, tk.END)
+        #self.entry_field_amount.insert(0, "0")
+
+        get_entry_field_date = self.entry_field_date.get()
+        get_entry_field_ddescription = self.entry_field_description.get()
+        get_entry_field_category = self.entry_field_category.get()
+        get_entry_field_amount = float(self.entry_field_amount.get())
+
+        self.adding_spending(get_entry_field_date, get_entry_field_ddescription, get_entry_field_category, get_entry_field_amount)
+
 
         # ADD SQL DATA into FINANCE TABLE =============================
     def adding_spending(self, *args):
         #add check of list
+        self.table_spending_history.delete(*self.table_spending_history.get_children())
+
         sql.add_spending(args)
+
+        self.refresh_sqldata()
+
+        # READ SQL DATA into SPENDING HISTORY =============================
+    def refresh_sqldata(self):
+        #self.table_spending_history.delete()
+        val = sql.spending_history()
+        for idx, v in reversed(list(enumerate(val, start=1))):
+            self.table_spending_history.insert("", idx, values=v[1:])
+        #table_spending_history.insert("", 0, values=["2020-01-01", "hello", "auto", 50.0])
 
 class Income(tk.Frame):
     def __init__(self, parent, controller):

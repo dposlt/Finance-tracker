@@ -74,11 +74,12 @@ class MySQLconnection:
             sql_command = f"SELECT * FROM FINANCE"
             self.my_cursor.execute(sql_command)
             rows = list(self.my_cursor.fetchall())
-            return rows[0][1:]
+            
+            return rows
 
     def add_spending(self, args):
         if self.connection:
-            sql = f"INSERT INTO FINANCE VALUES {args};"
+            sql = f"INSERT INTO FINANCE(DATE, DESCRIPTION, CATEGORY, AMOUNT) VALUES {args};"
             print(sql)
             self.my_cursor.execute(sql)
             self.db_connection.commit()
