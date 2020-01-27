@@ -41,6 +41,7 @@ class MySQLconnection:
         self.table_name = table_name
         sql = f"CREATE TABLE {table_name} ({columns})"
         self.my_cursor.execute(sql)
+        self.db_connection.commit()
         self.table = True
 
     def insert_values(self, table_name, *args ):
@@ -71,23 +72,40 @@ class MySQLconnection:
 
     def spending_history(self):
         if self.connection:
-            sql_command = f"SELECT * FROM FINANCE"
+            sql_command = f"SELECT * FROM budget"
             self.my_cursor.execute(sql_command)
             rows = list(self.my_cursor.fetchall())
-            
             return rows
 
-    def add_spending(self, args):
+    def add_spending(self, table_name, args):
         if self.connection:
-            sql = f"INSERT INTO FINANCE(DATE, DESCRIPTION, CATEGORY, AMOUNT) VALUES {args};"
-            print(sql)
+            sql = f"INSERT INTO {table_name}(DATE, DESCRIPTION, CATEGORY, AMOUNT) VALUES {args};"
+            #print(sql)
             self.my_cursor.execute(sql)
             self.db_connection.commit()
-            print(f"Values {args} added.")
+            #print(f"Values {args} added.")
 
     def mysql_disconnect(self):
         self.db_connection.close()
         print("Connection to db closed.")
+
+    def category(self, table_name):
+        if self.connection:
+            sql=f"SELECT DISTINCT CATEGORY FROM {table_name} ORDER BY CATEGORY ASC;"
+            self.my_cursor.execute(sql)
+        return tuple(x[0] for x in self.my_cursor.fetchall())
+
+    def delete_row(self, arg):
+        if self.connection:
+            sql = f"DELETE FROM budget WHERE DATE=STR_TO_DATE('{arg[0]}', '%d-%m-%Y') AND DESCRIPTION='{str(arg[1])}' AND CATEGORY='{str(arg[2])}' AND AMOUNT='{arg[3]}';"
+            self.my_cursor.execute(sql)
+            self.db_connection.commit()
+
+    def action(self, todo):
+        if self.connection:
+            self.my_cursor.execute(todo)
+            self.db_connection.commit()
+            print(self.my_cursor.fetchall())
 
     # def actions(self):
     #     if self.connection:
@@ -97,14 +115,15 @@ if __name__ == "__main__":
     sqlconnection = MySQLconnection()
     connection = sqlconnection.connect(host="sql7.freesqldatabase.com", user="sql7320036", passwd="GeftKNBYht", db="sql7320036")
     if sqlconnection.connection:
-        #sqlconnection.drop_table("TRACKER")
-        #sqlconnection.create_table("FINANCE", "ID INT PRIMARY KEY, DATE DATE NOT NULL, DESCRIPTION VARCHAR(25) NOT NULL, CATEGORY VARCHAR(10) NOT NULL, AMOUNT FLOAT DEFAULT 0.00")
+        #sqlconnection.drop_table("budget")
+        #sqlconnection.create_table("budget", "ID INT PRIMARY KEY AUTO_INCREMENT, DATE DATE NOT NULL, DESCRIPTION VARCHAR(25) NOT NULL, CATEGORY VARCHAR(10) NOT NULL, AMOUNT FLOAT DEFAULT 0.00")
 
-
-        #sqlconnection.insert_values("FINANCE", '1', '01-01-2020', 'Tankovanie','Auto' ,'10.00')
-        #sqlconnection.insert_values("FINANCE", '2', '02-01-2020','Tesco nakup','Potraviny' ,'4.50')
+        #sqlconnection.insert_values("budget", '1', '27-01-2020', 'Tankovanie','Auto' ,'10.00')
+        #sqlconnection.insert_values("budget", '2', '26-01-2020','Tesco nakup','Potraviny' ,'4.50')
 
         # sqlconnection.read_table("FINANCE")
-        sqlconnection.spending_history()
-
+        print(sqlconnection.spending_history())
+        #sqlconnection.action('SHOW CREATE TABLE budget;')
+        #sqlconnection.action('DELETE FROM budget WHERE ID=6;')
+        #print(sqlconnection.category())
         sqlconnection.mysql_disconnect()
