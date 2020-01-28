@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import MySQLdb
 
 
@@ -8,7 +6,6 @@ class MySQLconnection:
         self.connection = False
         self.table = False
 
-    # Open database connection, list to CLI the available tables in the db
     def connect(self, host, user, passwd, db):
         try:
             self.db_connection = MySQLdb.connect(host, user, passwd, db)
@@ -19,16 +16,11 @@ class MySQLconnection:
         if self.connection:
             self.my_cursor = self.db_connection.cursor()
             print("\nConnected to SQL server!\n.")
-            # self.my_cursor.execute("SHOW TABLES")
-            # self.tables = self.my_cursor.fetchall()[0]
-            # print(f"Available tables in db: {self.tables}\n.")
 
-    # Drop table
     def drop_table(self, table_name):
         if self.connection:
             self.my_cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
 
-    # Create table
     def create_table(self, table_name, columns):
         """Creating table in the SQL database.
 
@@ -60,30 +52,30 @@ class MySQLconnection:
 
     def read_table(self, table_name):
         """Read the conent of the table to the CLI"""
-
         if self.connection:
             sql_command = f"SELECT * FROM {table_name}"
             self.my_cursor.execute(f"SELECT * FROM {table_name}")
             rows = self.my_cursor.fetchall()
-            print(f"{table_name} table content using: '{sql_command}'")
 
-            for row in rows:
-                print(row)
 
-    def spending_history(self):
+    def spending_history(self, tbl):
         if self.connection:
-            sql_command = f"SELECT * FROM budget"
+            sql_command = f"SELECT * FROM {tbl}"
             self.my_cursor.execute(sql_command)
             rows = list(self.my_cursor.fetchall())
             return rows
 
-    def add_spending(self, table_name, args):
+    def add_cost(self, table_name, args):
         if self.connection:
-            sql = f"INSERT INTO {table_name}(DATE, DESCRIPTION, CATEGORY, AMOUNT) VALUES {args};"
-            #print(sql)
+            sql = f"INSERT INTO {table_name} (DATE, DESCRIPTION, CATEGORY, SPENDING) VALUES {args};"
             self.my_cursor.execute(sql)
             self.db_connection.commit()
-            #print(f"Values {args} added.")
+
+    def add_income(self, table_name, args):
+        if self.connection:
+            sql = f"INSERT INTO {table_name} (DATE, DESCRIPTION, CATEGORY, INCOMES) VALUES {args};"
+            self.my_cursor.execute(sql)
+            self.db_connection.commit()
 
     def mysql_disconnect(self):
         self.db_connection.close()
@@ -95,9 +87,9 @@ class MySQLconnection:
             self.my_cursor.execute(sql)
         return tuple(x[0] for x in self.my_cursor.fetchall())
 
-    def delete_row(self, arg):
+    def delete_row(self, tbl, arg):
         if self.connection:
-            sql = f"DELETE FROM budget WHERE DATE=STR_TO_DATE('{arg[0]}', '%d-%m-%Y') AND DESCRIPTION='{str(arg[1])}' AND CATEGORY='{str(arg[2])}' AND AMOUNT='{arg[3]}';"
+            sql = f"DELETE FROM tbl WHERE DATE=STR_TO_DATE('{arg[0]}', '%d-%m-%Y') AND DESCRIPTION='{str(arg[1])}' AND CATEGORY='{str(arg[2])}' AND AMOUNT='{arg[3]}';"
             self.my_cursor.execute(sql)
             self.db_connection.commit()
 
@@ -107,23 +99,19 @@ class MySQLconnection:
             self.db_connection.commit()
             print(self.my_cursor.fetchall())
 
-    # def actions(self):
-    #     if self.connection:
-    #         sql = f"CREATE TABLE {table_name} ({columns})"
-    #         self.my_cursor.execute(sql)
 if __name__ == "__main__":
     sqlconnection = MySQLconnection()
     connection = sqlconnection.connect(host="sql7.freesqldatabase.com", user="sql7320036", passwd="GeftKNBYht", db="sql7320036")
     if sqlconnection.connection:
         #sqlconnection.drop_table("budget")
-        #sqlconnection.create_table("budget", "ID INT PRIMARY KEY AUTO_INCREMENT, DATE DATE NOT NULL, DESCRIPTION VARCHAR(25) NOT NULL, CATEGORY VARCHAR(10) NOT NULL, AMOUNT FLOAT DEFAULT 0.00")
+        #sqlconnection.create_table("tbl_incomes", "ID INT PRIMARY KEY AUTO_INCREMENT, DATE DATE NOT NULL, DESCRIPTION VARCHAR(25) NOT NULL, CATEGORY VARCHAR(10) NOT NULL, INCOMES FLOAT DEFAULT 0.00")
 
         #sqlconnection.insert_values("budget", '1', '27-01-2020', 'Tankovanie','Auto' ,'10.00')
         #sqlconnection.insert_values("budget", '2', '26-01-2020','Tesco nakup','Potraviny' ,'4.50')
 
         # sqlconnection.read_table("FINANCE")
-        print(sqlconnection.spending_history())
-        #sqlconnection.action('SHOW CREATE TABLE budget;')
+        #print(sqlconnection.spending_history())
+        sqlconnection.action('SHOW COLUMNS FROM tbl_spendings;')
         #sqlconnection.action('DELETE FROM budget WHERE ID=6;')
         #print(sqlconnection.category())
         sqlconnection.mysql_disconnect()
