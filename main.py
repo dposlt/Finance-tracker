@@ -45,7 +45,10 @@ class DashBoard(tk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
         sql.connect(host="sql7.freesqldatabase.com", user="sql7320036", passwd="GeftKNBYht", db="sql7320036")
-
+        self.cost_sql_table = "tbl_spendings"
+        self.incomes_sql_table = "tbl_incomes"
+        self.df_costs = Spending(parent, controller).df_costs
+        self.df_incomes = Income(parent, controller).df_incomes
         label = tk.Label(self, text="DASHBOARD", font=("Helvetica", 24, "bold"), foreground="darkblue")
         label.place(x=400, y=10)
         # MENU ======================================================================
@@ -68,33 +71,58 @@ class DashBoard(tk.Frame):
         btn_income.place(x=0, y=140, width=200, height=50)
         btn_setting.place(x=0, y=210, width=200, height=50)
 
-        # TABLE ======================================================================
-        tv_dashboard = ttk.Treeview(self, height=6,selectmode="none", displaycolumns="#all")
-        tv_dashboard['columns'] = ("incomes", "expenses", "balance", "total")
-        tv_dashboard.heading("incomes", text="INCOMES")
-        tv_dashboard.heading("expenses", text="EXPENSES")
-        tv_dashboard.heading("balance", text="BALANCE")
-        tv_dashboard.heading("total", text="TOTAL")
+ # DASH CUMULATIVE ========================================================
+        self.tv_dash_history = ttk.Treeview(self, height=10, selectmode="browse", displaycolumns="#all")
+        self.tv_dash_history['columns'] = ("DATE", "AMOUNT")
+        self.tv_dash_history.heading("DATE", text="DATE")
+        self.tv_dash_history.heading("AMOUNT", text="AMOUNT")
+        self.tv_dash_history.column("#0", width=0, minwidth=0, stretch=tk.NO)
+        self.tv_dash_history.column("DATE", width=120, minwidth=120, stretch=tk.NO)
+        self.tv_dash_history.column("AMOUNT", width=90, minwidth=90, stretch=tk.NO)
+        self.tv_dash_history.tag_configure(self, background='red')
+        self.tv_dash_history.place(x=250, y=70)
+        self.treeScroll = ttk.Scrollbar(self, command=self.tv_dash_history.yview)
+        self.treeScroll.place(x=465, y=70, height=227)
+        self.tv_dash_history.configure(yscrollcommand=self.treeScroll.set)
+        self.refresh_sqldata()
+        self.plot()
 
-        tv_dashboard.column("#0", width=100, minwidth=100, stretch=tk.NO)
-        tv_dashboard.column("incomes", width=85, minwidth=85, stretch=tk.NO)
-        tv_dashboard.column("expenses", width=85, minwidth=85, stretch=tk.NO)
-        tv_dashboard.column("balance", width=85, minwidth=85, stretch=tk.NO)
-        tv_dashboard.column("total", width=85, minwidth=85, stretch=tk.NO)
-        tv_dashboard.tag_configure(self, background='red')
+    def refresh_sqldata(self):
+        self.tv_dash_history.delete(*self.tv_dash_history.get_children())
+        val = sql.joint_result(self.cost_sql_table, self.incomes_sql_table)
+        for ind, row in self.plot().iterrows():
+            self.tv_dash_history.insert("", ind, values=[row[0], round(row[1],2)])
 
-        tv_dashboard.insert("", 0,text="January 2020")
-        tv_dashboard.insert("", 1,text="February 2020")
-        tv_dashboard.insert("", 2,text="March 2020")
-        tv_dashboard.insert("", 3,text="April 2020")
-        tv_dashboard.insert("", 4,text="February 2020")
-        tv_dashboard.insert("", 5,text="March 2020")
-        tv_dashboard.insert("", 6,text="April 2020")
-        tv_dashboard.insert("", 7,text="February 2020")
-        tv_dashboard.insert("", 8,text="March 2020")
-        tv_dashboard.insert("", 9,text="April 2020")
+    def plot(self):
+        x = np.array([xx[1] for xx in sql.joint_result(self.cost_sql_table, self.incomes_sql_table)], dtype=str) #dates
+        y = np.array([b[4] for b in sql.joint_result(self.cost_sql_table, self.incomes_sql_table)], dtype=float)  #EUR
+        df = pd.DataFrame(data={'Date': x, 'Total': y}, columns=['Date', 'Total'])
+        df['Month'] = df['Date'].apply(lambda x: x[:7])
+        df = df.groupby(['Month'])['Total'].sum()
+        df= df.cumsum()
 
-        tv_dashboard.place(x=280, y=70)
+        fig = Figure(figsize=(5,3), dpi=100, facecolor='lightgrey', tight_layout=True)
+        axs = fig.add_subplot(111)
+        fig.subplots_adjust(hspace=1.75)
+        axs.set_title("Cumulative trend")
+        axs.plot(df, '--', label='trend')
+        axs.plot(df, 'o')
+        axs.plot(self.df_costs, '-', label='costs')
+        axs.plot(self.df_incomes, '-', label='incomes')
+        axs.legend()
+        axs.grid(True)
+        fig.autofmt_xdate(bottom=0.2, rotation=45, ha='right')
+        axs.set_ylabel('EUR')
+
+        canvas = FigureCanvasTkAgg(fig, self)
+        canvas.get_tk_widget().place(x=250, y= 315)
+        canvas.draw()
+
+        df_new= pd.Series.to_frame(df)
+        df_new['Date'] = list(df_new.index)
+        df_new = df_new[['Date', 'Total']].reset_index(drop=True)
+        return df_new
+
 
 class Spending(tk.Frame):
     def __init__(self, parent, controller):
@@ -187,7 +215,7 @@ class Spending(tk.Frame):
         df['Month'] = df['Date'].apply(lambda x: x[:7])
         df = df.groupby(['Month'])['Total'].sum()
         df= df.cumsum()
-
+        self.df_costs = df
         fig = Figure(figsize=(5,2.5), dpi=100, facecolor='lightgrey', tight_layout=True)
         axs = fig.add_subplot(111)
         fig.subplots_adjust(hspace=1.75)
@@ -344,7 +372,7 @@ class Income(tk.Frame):
         df['Month'] = df['Date'].apply(lambda x: x[:7])
         df = df.groupby(['Month'])['Total'].sum()
         df= df.cumsum()
-
+        self.df_incomes = df
         fig = Figure(figsize=(5,2.5), dpi=100, facecolor='lightgrey', tight_layout=True)
         axs = fig.add_subplot(111)
         fig.subplots_adjust(hspace=1.75)

@@ -1,4 +1,5 @@
 import MySQLdb
+from tabulate import tabulate
 
 
 class MySQLconnection:
@@ -99,6 +100,21 @@ class MySQLconnection:
             self.db_connection.commit()
             print(self.my_cursor.fetchall())
 
+    def joint_result(self, tbl1, tbl2):
+        if self.connection:
+            sql1 = f"SELECT * FROM {tbl1}"
+            sql2 = f"SELECT * FROM {tbl2}"
+            res1 = self.my_cursor.execute(sql1)
+
+            r1 =list(self.my_cursor.fetchall())
+            res2 = self.my_cursor.execute(sql2)
+            r2 = list(self.my_cursor.fetchall())
+            r = r1+r2
+            #print(r)
+            #print(tabulate(r, tablefmt='mysql'))
+        return r
+
+
 if __name__ == "__main__":
     sqlconnection = MySQLconnection()
     connection = sqlconnection.connect(host="sql7.freesqldatabase.com", user="sql7320036", passwd="GeftKNBYht", db="sql7320036")
@@ -110,8 +126,12 @@ if __name__ == "__main__":
         #sqlconnection.insert_values("budget", '2', '26-01-2020','Tesco nakup','Potraviny' ,'4.50')
 
         # sqlconnection.read_table("FINANCE")
-        #print(sqlconnection.spending_history())
-        sqlconnection.action('SHOW COLUMNS FROM tbl_spendings;')
+        #print(tabulate(sqlconnection.spending_history('tbl_spendings')))
+        #print(tabulate(sqlconnection.spending_history('tbl_incomes')))
+        #x = sqlconnection.spending_history('tbl_spendings') + sqlconnection.spending_history('tbl_incomes')
+        #print(tabulate(x))
+        #sqlconnection.action('SHOW COLUMNS FROM tbl_spendings;')
         #sqlconnection.action('DELETE FROM budget WHERE ID=6;')
         #print(sqlconnection.category())
+        sqlconnection.joint_result('tbl_spendings', 'tbl_incomes')
         sqlconnection.mysql_disconnect()
