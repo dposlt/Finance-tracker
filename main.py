@@ -1,4 +1,4 @@
-from SQLbackbone import MySQLconnection
+from sqlitedb import SqlDb
 import tkinter as tk
 from tkinter import messagebox, ttk
 from datetime import date
@@ -19,20 +19,20 @@ ACTUAL_DATE = date.today().strftime("%d-%m-%Y")
 class BudgetTracker(tk.Tk):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        tk.Tk.wm_title(self, 'Buget Tracker')
+        tk.Tk.wm_title(self, 'Finance Tracker')
         tk.Tk.iconbitmap(self, 'wallet.ico')
-        tk.Tk.geometry(self, '800x700')
+        tk.Tk.geometry(self, '820x740')
         ttk.Style(self)
         ttk.Style.theme_use(self, 'xpnative')
 
         container = tk.Frame(self)
-        container.place(x=0, y=0, width=800, height=800)
+        container.place(x=0, y=0, width=820, height=740)
 
         self.frames = {}
-        for Page in (DashBoard, Spending, Income, Setting):
+        for Page in (DashBoard, Spending, Income):
             frame = Page(container, self)
             self.frames[Page] = frame
-            frame.place(x=10, y=10, width=780, height=780)
+            frame.place(x=10, y=10, width=800, height=720)
 
         # frame.configure(bg='grey')
         self.show_frame(DashBoard)
@@ -41,21 +41,27 @@ class BudgetTracker(tk.Tk):
         frame = self.frames[cont]
         frame.tkraise()
 
+        if cont == DashBoard:
+            frame.reload()
+
 class DashBoard(tk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
-        sql.connect(host="sql7.freesqldatabase.com", user="sql7320036", passwd="GeftKNBYht", db="sql7320036")
+        self.target = 2000
+        self.configure(relief='ridge', borderwidth=5, padx=10, pady=10)
+        sql.connect('data.db')
         self.cost_sql_table = "tbl_spendings"
         self.incomes_sql_table = "tbl_incomes"
         self.df_costs = Spending(parent, controller).df_costs
         self.df_incomes = Income(parent, controller).df_incomes
         label = tk.Label(self, text="DASHBOARD", font=("Helvetica", 24, "bold"), foreground="darkblue")
         label.place(x=400, y=10)
+        label_sql = ttk.Label(self, text="Connected to: "+str(sql))
+        label_sql.place(x=0, y=680)
         # MENU ======================================================================
         btn_dashboard_pic = tk.PhotoImage(file="img\\dash_button_sm.png")
         btn_spending_pic = tk.PhotoImage(file="img\\spending_button_sm.png")
         btn_income_pic = tk.PhotoImage(file="img\\income_button_sm.png")
-        btn_setting_pci = tk.PhotoImage(file="img\\setting_button_sm.png")
 
         btn_dashboard = ttk.Button(self, image=btn_dashboard_pic, text="DASHBOARD", width=15, command=lambda: controller.show_frame(DashBoard), compound='left')
         btn_dashboard.image=btn_dashboard_pic
@@ -63,14 +69,16 @@ class DashBoard(tk.Frame):
         btn_spending.image = btn_spending_pic
         btn_income = ttk.Button(self, image=btn_income_pic, text="      INCOMES", width=22, command=lambda: controller.show_frame(Income), compound='left')
         btn_income.image = btn_income_pic
-        btn_setting = ttk.Button(self, image=btn_setting_pci, text="         SETTING", width=22, command=lambda: controller.show_frame(Setting), compound='left')
-        btn_setting.image = btn_setting_pci
-
         btn_dashboard.place(x=20, y=0, width=200, height=50)
         btn_spending.place(x=0, y=70, width=200, height=50)
         btn_income.place(x=0, y=140, width=200, height=50)
-        btn_setting.place(x=0, y=210, width=200, height=50)
-
+# Target ==============================================================
+        self.lbl_target = ttk.Label(self, text='Target savings')
+        self.lbl_target.place(x=500, y=70)
+        self.ent_target = ttk.Entry(self)
+        self.ent_target.place(x=500, y=90)
+        self.btn_target = ttk.Button(self, text='Save', command=self.save_target)
+        self.btn_target.place(x=650, y=88)
  # DASH CUMULATIVE ========================================================
         self.tv_dash_history = ttk.Treeview(self, height=10, selectmode="browse", displaycolumns="#all")
         self.tv_dash_history['columns'] = ("DATE", "AMOUNT")
@@ -87,6 +95,12 @@ class DashBoard(tk.Frame):
         self.refresh_sqldata()
         self.plot()
 
+    def save_target(self):
+        self.target = int(self.ent_target.get())
+        self.ent_target.configure(state='disabled')
+        self.refresh_sqldata()
+        self.plot()
+
     def refresh_sqldata(self):
         self.tv_dash_history.delete(*self.tv_dash_history.get_children())
         val = sql.joint_result(self.cost_sql_table, self.incomes_sql_table)
@@ -97,7 +111,7 @@ class DashBoard(tk.Frame):
         x = np.array([xx[1] for xx in sql.joint_result(self.cost_sql_table, self.incomes_sql_table)], dtype=str) #dates
         y = np.array([b[4] for b in sql.joint_result(self.cost_sql_table, self.incomes_sql_table)], dtype=float)  #EUR
         df = pd.DataFrame(data={'Date': x, 'Total': y}, columns=['Date', 'Total'])
-        df['Month'] = df['Date'].apply(lambda x: x[:7])
+        df['Month'] = df['Date'].apply(lambda x: x[-7:])
         df = df.groupby(['Month'])['Total'].sum()
         df= df.cumsum()
 
@@ -105,10 +119,12 @@ class DashBoard(tk.Frame):
         axs = fig.add_subplot(111)
         fig.subplots_adjust(hspace=1.75)
         axs.set_title("Cumulative trend")
-        axs.plot(df, '--', label='trend')
-        axs.plot(df, 'o')
-        axs.plot(self.df_costs, '-', label='costs')
-        axs.plot(self.df_incomes, '-', label='incomes')
+        axs.plot(df, 'bo--', label='trend')
+        axs.plot(self.df_costs, 'r-', label='costs')
+        axs.plot(self.df_incomes, 'g-', label='incomes')
+        x_min = min([self.df_costs.index.min(), self.df_incomes.index.min()])
+        x_max = max([self.df_costs.index.max(), self.df_incomes.index.max()])
+        axs.hlines(self.target, xmin=x_min, xmax=x_max, colors='k', linestyle='-', label='target')
         axs.legend()
         axs.grid(True)
         fig.autofmt_xdate(bottom=0.2, rotation=45, ha='right')
@@ -120,13 +136,20 @@ class DashBoard(tk.Frame):
 
         df_new= pd.Series.to_frame(df)
         df_new['Date'] = list(df_new.index)
-        df_new = df_new[['Date', 'Total']].reset_index(drop=True)
+        df_new = df_new[['Date', 'Total']].iloc[::-1].reset_index(drop=True)
         return df_new
 
+    def reload(self):
+
+        self.df_costs = Spending(self, self).df_costs
+        self.df_incomes = Income(self, self).df_incomes
+        self.plot()
+        self.refresh_sqldata()
 
 class Spending(tk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
+        self.configure(relief='ridge', borderwidth=5, padx=10, pady=10)
         self.lbl_alert = tk.Label(self, text="", fg='red')
         self.lbl_alert.place(x=250, y= 135)
         self.cost_sql_table = "tbl_spendings"
@@ -134,11 +157,12 @@ class Spending(tk.Frame):
 
         label = tk.Label(self, text="SPENDING", font=("Helvetica", 24, "bold"), foreground="darkblue")
         label.place(x=420, y=10)
+        label_sql = ttk.Label(self, text="Connected to: "+str(sql))
+        label_sql.place(x=0, y=680)
         # LEFT PANEL ==============================================================
         btn_dashboard_pic = tk.PhotoImage(file="img\\dash_button_sm.png")
         btn_spending_pic = tk.PhotoImage(file="img\\spending_button_sm.png")
         btn_income_pic = tk.PhotoImage(file="img\\income_button_sm.png")
-        btn_setting_pci = tk.PhotoImage(file="img\\setting_button_sm.png")
 
         btn_dashboard = ttk.Button(self, image=btn_dashboard_pic, text="DASHBOARD", width=15, command=lambda: controller.show_frame(DashBoard), compound='left')
         btn_dashboard.image=btn_dashboard_pic
@@ -146,13 +170,10 @@ class Spending(tk.Frame):
         btn_spending.image = btn_spending_pic
         btn_income = ttk.Button(self, image=btn_income_pic, text="      INCOMES", width=22, command=lambda: controller.show_frame(Income), compound='left')
         btn_income.image = btn_income_pic
-        btn_setting = ttk.Button(self, image=btn_setting_pci, text="         SETTING", width=22, command=lambda: controller.show_frame(Setting), compound='left')
-        btn_setting.image = btn_setting_pci
 
         btn_dashboard.place(x=0, y=0, width=200, height=50)
         btn_spending.place(x=20, y=70, width=200, height=50)
         btn_income.place(x=0, y=140, width=200, height=50)
-        btn_setting.place(x=0, y=210, width=200, height=50)
 
         # ENTRY FIELD ============================================================
         lbl_sp_date = ttk.Label(self, text="Date")
@@ -209,10 +230,10 @@ class Spending(tk.Frame):
         self.plot()
 
     def plot(self):
-        x = np.array([xx[1] for xx in sql.spending_history(self.cost_sql_table)], dtype=str) #dates
-        y = np.array([b[4] for b in sql.spending_history(self.cost_sql_table)], dtype=float)  #EUR
+        x = np.array([xx[1] for xx in sql.list_sqltbl(self.cost_sql_table)], dtype=str) #dates
+        y = np.array([b[4] for b in sql.list_sqltbl(self.cost_sql_table)], dtype=float)  #EUR
         df = pd.DataFrame(data={'Date': x, 'Total': y}, columns=['Date', 'Total'])
-        df['Month'] = df['Date'].apply(lambda x: x[:7])
+        df['Month'] = df['Date'].apply(lambda x: x[-7:])
         df = df.groupby(['Month'])['Total'].sum()
         df= df.cumsum()
         self.df_costs = df
@@ -228,26 +249,26 @@ class Spending(tk.Frame):
         canvas = FigureCanvasTkAgg(fig, self)
         canvas.get_tk_widget().place(x=253, y= 435)
         canvas.draw()
-        return df[-1]
+        if len(df):
+            return df[-1]
+        return 0
 
     def delete_row(self):
         self.selected_row = self.tv_spending_history.selection()
         self.subject = self.tv_spending_history.item(self.selected_row)['values']
-        sql.delete_row(self.cost_sql_table, self.self.subject)
+        sql.delete_row_spending(self.cost_sql_table, self.subject)
         self.refresh_sqldata()
+        self.plot()
 
     def submitt(self):
         get_entry_field_date = self.ent_field_date.get()
         get_entry_field_amount = self.ent_field_amount.get()
         date_format_valid = re.match("^\s*(3[01]|[12][0-9]|0?[1-9])\-(1[012]|0?[1-9])\-((?:19|20)\d{2})\s*$", get_entry_field_date)
         amount_format_valid = re.match("^\d*\.?\d*$", get_entry_field_amount)
-        if date_format_valid:
-            dt = datetime.datetime.strptime(get_entry_field_date, '%d-%m-%Y').strftime('%Y,%m,%d')
-            get_entry_field_date = dt
-        else:
+        if not date_format_valid:
             self.lbl_alert['text'] = "Wrong format of Date"
         if amount_format_valid:
-            get_entry_field_amount = -float(self.ent_field_amount.get())
+            get_entry_field_amount = round(-float(self.ent_field_amount.get()),2)
         else:
             self.lbl_alert['text'] = "Wrong format of Amount"
         get_entry_field_ddescription = self.ent_field_description.get()
@@ -273,16 +294,17 @@ class Spending(tk.Frame):
         # READ SQL DATA into SPENDING HISTORY =============================
     def refresh_sqldata(self):
         self.tv_spending_history.delete(*self.tv_spending_history.get_children())
-        val = sql.spending_history(self.cost_sql_table)
+        val = sql.list_sqltbl(self.cost_sql_table)
         for idx, v in reversed(list(enumerate(val, start=1))):
             v_list = [x for x in v]
-            v_list[1] = datetime.datetime.strftime(v_list[1],"%d-%m-%Y")
-            if v_list[4] < 0:
-                self.tv_spending_history.insert("", idx, values=v_list[1:])
+            #v_list[1] = datetime.datetime.strftime(v_list[1],"%d-%m-%Y")
+            #if v_list[4] < 0:
+            self.tv_spending_history.insert("", idx, values=v_list[1:])
 
 class Income(tk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
+        self.configure(relief='ridge', borderwidth=5, padx=10, pady=10)
         self.lbl_alert = tk.Label(self, text="", fg='red')
         self.lbl_alert.place(x=250, y= 135)
         self.cost_sql_table = "tbl_spendings"
@@ -290,11 +312,12 @@ class Income(tk.Frame):
 
         label = tk.Label(self, text="INCOME PAGE", font=("Helvetica", 24, "bold"), foreground="darkblue")
         label.place(x=420, y=10)
+        label_sql = ttk.Label(self, text="Connected to: "+str(sql))
+        label_sql.place(x=0, y=680)
 
         btn_dashboard_pic = tk.PhotoImage(file="img\\dash_button_sm.png")
         btn_spending_pic = tk.PhotoImage(file="img\\spending_button_sm.png")
         btn_income_pic = tk.PhotoImage(file="img\\income_button_sm.png")
-        btn_setting_pci = tk.PhotoImage(file="img\\setting_button_sm.png")
 
         btn_dashboard = ttk.Button(self, image=btn_dashboard_pic, text="DASHBOARD", width=15, command=lambda: controller.show_frame(DashBoard), compound='left')
         btn_dashboard.image=btn_dashboard_pic
@@ -302,13 +325,10 @@ class Income(tk.Frame):
         btn_spending.image = btn_spending_pic
         btn_income = ttk.Button(self, image=btn_income_pic, text="      INCOMES", width=22, command=lambda: controller.show_frame(Income), compound='left')
         btn_income.image = btn_income_pic
-        btn_setting = ttk.Button(self, image=btn_setting_pci, text="         SETTING", width=22, command=lambda: controller.show_frame(Setting), compound='left')
-        btn_setting.image = btn_setting_pci
 
         btn_dashboard.place(x=0, y=0, width=200, height=50)
         btn_spending.place(x=0, y=70, width=200, height=50)
         btn_income.place(x=20, y=140, width=200, height=50)
-        btn_setting.place(x=0, y=210, width=200, height=50)
 
         # ENTRY FIELD ============================================================
         lbl_inc_date = ttk.Label(self, text="Date")
@@ -366,10 +386,10 @@ class Income(tk.Frame):
         self.plot()
 
     def plot(self):
-        x = np.array([xx[1] for xx in sql.spending_history(self.incomes_sql_table)], dtype=str)
-        y = np.array([b[4] for b in sql.spending_history(self.incomes_sql_table)], dtype=float)  # TODO: add cumulation
+        x = np.array([xx[1] for xx in sql.list_sqltbl(self.incomes_sql_table)], dtype=str)
+        y = np.array([b[4] for b in sql.list_sqltbl(self.incomes_sql_table)], dtype=float)  # TODO: add cumulation
         df = pd.DataFrame(data={'Date': x, 'Total': y}, columns=['Date', 'Total'])
-        df['Month'] = df['Date'].apply(lambda x: x[:7])
+        df['Month'] = df['Date'].apply(lambda x: x[-7:])
         df = df.groupby(['Month'])['Total'].sum()
         df= df.cumsum()
         self.df_incomes = df
@@ -390,21 +410,19 @@ class Income(tk.Frame):
     def delete_row(self):
         self.selected_row = self.tv_incomes_history.selection()
         self.subject = self.tv_incomes_history.item(self.selected_row)['values']
-        sql.delete_row(self.subject)
+        sql.delete_row_income(self.incomes_sql_table, self.subject)
         self.refresh_sqldata()
+        self.plot()
 
     def submit_inc(self):
         get_entry_field_date = self.ent_field_date.get()
         get_entry_field_amount = self.ent_field_amount.get()
         date_format_valid = re.match("^\s*(3[01]|[12][0-9]|0?[1-9])\-(1[012]|0?[1-9])\-((?:19|20)\d{2})\s*$", get_entry_field_date)
         amount_format_valid = re.match("^\d*\.?\d*$", get_entry_field_amount)
-        if date_format_valid:
-            dt = datetime.datetime.strptime(get_entry_field_date, '%d-%m-%Y').strftime('%Y,%m,%d')
-            get_entry_field_date = dt
-        else:
+        if not date_format_valid:
             self.lbl_alert['text'] = "Wrong format of Date"
         if amount_format_valid:
-            get_entry_field_amount = float(self.ent_field_amount.get())
+            get_entry_field_amount = format(float(self.ent_field_amount.get()),'.2f')
         else:
             self.lbl_alert['text'] = "Wrong format of Amount"
         get_entry_field_ddescription = self.ent_field_description.get()
@@ -430,41 +448,16 @@ class Income(tk.Frame):
         # READ SQL DATA into SPENDING HISTORY =============================
     def refresh_sqldata(self):
         self.tv_incomes_history.delete(*self.tv_incomes_history.get_children())
-        val = sql.spending_history(self.incomes_sql_table)
+        val = sql.list_sqltbl(self.incomes_sql_table)
         for idx, v in reversed(list(enumerate(val, start=1))):
             v_list = [x for x in v]
-            v_list[1] = datetime.datetime.strftime(v_list[1],"%d-%m-%Y")
-            if v_list[4] > 0:
-                self.tv_incomes_history.insert("", idx, values=v_list[1:])
-
-class Setting(tk.Frame):
-    def __init__(self, parent, controller):
-        super().__init__(parent)
-        btn_dashboard_pic = tk.PhotoImage(file="img\\dash_button_sm.png")
-        btn_spending_pic = tk.PhotoImage(file="img\\spending_button_sm.png")
-        btn_income_pic = tk.PhotoImage(file="img\\income_button_sm.png")
-        btn_setting_pci = tk.PhotoImage(file="img\\setting_button_sm.png")
-
-        label = tk.Label(self, text="SETTING", font=("Helvetica", 24, "bold"), foreground="darkblue")
-        label.place(x=420, y=10)
-
-        btn_dashboard = ttk.Button(self, image=btn_dashboard_pic, text="DASHBOARD", width=15, command=lambda: controller.show_frame(DashBoard), compound='left')
-        btn_dashboard.image=btn_dashboard_pic
-        btn_spending = ttk.Button(self, image=btn_spending_pic, text="      SPENDINGS", width=22, command=lambda: controller.show_frame(Spending), compound='left')
-        btn_spending.image = btn_spending_pic
-        btn_income = ttk.Button(self, image=btn_income_pic, text="      INCOMES", width=22, command=lambda: controller.show_frame(Income), compound='left')
-        btn_income.image = btn_income_pic
-        btn_setting = ttk.Button(self, image=btn_setting_pci, text="         SETTING", width=22, command=lambda: controller.show_frame(Setting), compound='left')
-        btn_setting.image = btn_setting_pci
-
-        btn_dashboard.place(x=0, y=0, width=200, height=50)
-        btn_spending.place(x=0, y=70, width=200, height=50)
-        btn_income.place(x=0, y=140, width=200, height=50)
-        btn_setting.place(x=20, y=210, width=200, height=50)
+            #v_list[1] = datetime.datetime.strftime(v_list[1],"%d-%m-%Y")
+            #v_list[4] = str(format(v_list[4], '.2f'))
+            self.tv_incomes_history.insert("", idx, values=v_list[1:])
 
 
 if __name__ == '__main__':
-    sql = MySQLconnection()
+    sql = SqlDb()
     app = BudgetTracker()
     app.mainloop()
-    sql.mysql_disconnect()
+    sql.disconnect()
