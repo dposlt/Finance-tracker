@@ -1,0 +1,4 @@
+tabulate
+sqlite3
+numpy
+pandas
