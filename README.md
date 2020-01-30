@@ -1,7 +1,7 @@
 <table align="center"><tr><td align="center" width="9999">
-# Finance tracker
 
-***
+<h1>Finance tracker</1>
+
 
 ![GitHub Logo](screenshots/screenshot_FO.png)
 
